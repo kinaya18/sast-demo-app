@@ -24,6 +24,15 @@ pipeline {
             }
         }
 
+        stage('Install Bandit') {
+            steps {
+                script {
+                    // Instal Bandit secara terpisah jika belum terinstal
+                    sh '. venv/bin/activate && pip install bandit'
+                }
+            }
+        }
+
         stage('Run Bandit Scan') {
             steps {
                 script {
