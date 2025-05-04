@@ -2,21 +2,37 @@ pipeline {
     agent any
 
     stages {
-        stage('Checkout') {
+        stage('Checkout Code') {
             steps {
-                git url: 'https://github.com/kinaya18/sast-demo-app.git', branch: 'master'
+                // Checkout kode dari repository Git
+                checkout scm
             }
         }
         stage('Install Dependencies') {
             steps {
-                sh 'pip install bandit'
+                script {
+                    // Membuat virtual environment
+                    sh 'python3 -m venv venv'
+                    
+                    // Mengaktifkan virtual environment dan menginstal bandit
+                    sh './venv/bin/pip install --upgrade pip'
+                    sh './venv/bin/pip install bandit'
+                }
             }
         }
         stage('SAST Analysis') {
             steps {
-                sh 'bandit -f xml -o bandit-output.xml -r . || true'
-                recordIssues tools: [bandit(pattern: 'bandit-output.xml')]
+                script {
+                    // Menjalankan Bandit untuk analisis SAST
+                    sh './venv/bin/bandit -r .'
+                }
             }
+        }
+    }
+    post {
+        always {
+            // Membersihkan virtual environment setelah pipeline selesai
+            sh 'rm -rf venv'
         }
     }
 }
