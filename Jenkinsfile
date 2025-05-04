@@ -1,34 +1,28 @@
 pipeline {
     agent any
+    
+    environment {
+        VIRTUAL_ENV = 'venv'
+        REQUIREMENTS_FILE = 'requirements.txt'
+        BANDIT_REPORT = 'bandit-report.json'
+        GIT_REPO_URL = 'https://github.com/kinaya18/sast-demo-app.git' // Pastikan ini URL repositori yang benar
+    }
 
     stages {
-        stage('Declarative: Checkout SCM') {
+        stage('Checkout SCM') {
             steps {
-                checkout scm
-            }
-        }
-
-        stage('Checkout Code') {
-            steps {
-                git credentialsId: 'github-token', url: 'https://github.com/kinaya18/sast-demo-app.git'
+                git url: "${GIT_REPO_URL}", branch: 'master', credentialsId: 'github-token'  // Ganti kredensial jika diperlukan
             }
         }
 
         stage('Setup Python Environment') {
             steps {
                 script {
-                    // Membuat virtual environment dan mengaktifkannya
-                    sh 'python3 -m venv venv'
-                    sh '. venv/bin/activate && pip install -r requirements.txt'  // Menggunakan tanda titik (dot) untuk shell
-                }
-            }
-        }
-
-        stage('Install Bandit') {
-            steps {
-                script {
-                    // Instal Bandit secara terpisah jika belum terinstal
-                    sh '. venv/bin/activate && pip install bandit'
+                    sh 'python3 -m venv ${VIRTUAL_ENV}'
+                    sh """
+                        . ${VIRTUAL_ENV}/bin/activate
+                        pip install -r ${REQUIREMENTS_FILE}
+                    """
                 }
             }
         }
@@ -36,8 +30,10 @@ pipeline {
         stage('Run Bandit Scan') {
             steps {
                 script {
-                    // Menjalankan Bandit untuk Static Application Security Testing (SAST)
-                    sh '. venv/bin/activate && bandit -r .'
+                    sh """
+                        . ${VIRTUAL_ENV}/bin/activate
+                        bandit -r . -f json -o ${BANDIT_REPORT}
+                    """
                 }
             }
         }
@@ -45,9 +41,19 @@ pipeline {
         stage('Publish Bandit Results') {
             steps {
                 script {
-                    // Menyimpan hasil scan Bandit ke dalam file
-                    sh 'bandit -r . -o bandit_report.json'
-                    archiveArtifacts artifacts: 'bandit_report.json', allowEmptyArchive: true
+                    archiveArtifacts artifacts: "${BANDIT_REPORT}", allowEmptyArchive: true
+                }
+            }
+        }
+
+        stage('Notify') {
+            steps {
+                script {
+                    if (currentBuild.result == 'SUCCESS') {
+                        echo "Pipeline selesai dengan sukses."
+                    } else {
+                        echo "Pipeline gagal. Periksa log untuk detail lebih lanjut."
+                    }
                 }
             }
         }
@@ -55,11 +61,14 @@ pipeline {
 
     post {
         always {
-            echo 'Pipeline selesai dijalankan.'
+            echo "Membersihkan lingkungan virtual."
+            sh 'rm -rf ${VIRTUAL_ENV}'
         }
-
         failure {
-            echo 'Pipeline gagal. Cek log error untuk info lebih lanjut.'
+            echo "Pipeline gagal. Periksa log untuk detail lebih lanjut."
+        }
+        success {
+            echo "Pipeline berhasil dijalankan."
         }
     }
 }
