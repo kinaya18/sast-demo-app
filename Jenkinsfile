@@ -11,16 +11,21 @@ pipeline {
         stage('Setup Virtual Environment') {
             steps {
                 script {
-                    // Jika tidak ada dependencies, tidak perlu virtual environment
-                    echo "No dependencies to install"
+                    // Membuat virtual environment jika diperlukan
+                    echo "Setting up virtual environment"
+                    sh 'python3 -m venv venv'
+                    sh './venv/bin/pip install bandit'  // Install Bandit dalam virtual environment
                 }
             }
         }
 
         stage('SAST Analysis') {
             steps {
-                // Langkah-langkah analisis SAST di sini
-                echo "Running SAST Analysis..."
+                script {
+                    // Menjalankan Bandit untuk analisis SAST pada aplikasi
+                    echo "Running SAST Analysis with Bandit..."
+                    sh './venv/bin/bandit -r . -o bandit-report.html'  // Analisis dengan Bandit dan hasilkan laporan HTML
+                }
             }
         }
     }
