@@ -1,59 +1,41 @@
 pipeline {
     agent any
-    
+
     environment {
-        VIRTUAL_ENV = 'venv'
-        REQUIREMENTS_FILE = 'requirements.txt'
-        BANDIT_REPORT = 'bandit-report.json'
-        GIT_REPO_URL = 'https://github.com/kinaya18/sast-demo-app.git' // Pastikan ini URL repositori yang benar
+        VENV = 'venv'  // Nama virtual environment
     }
 
     stages {
-        stage('Checkout SCM') {
+        // Stage pertama: Checkout kode dari GitHub
+        stage('Checkout') {
             steps {
-                git url: "${GIT_REPO_URL}", branch: 'master', credentialsId: 'github-token'  // Ganti kredensial jika diperlukan
+                git 'https://github.com/kinaya18/sast-demo-app.git'
             }
         }
 
-        stage('Setup Python Environment') {
+        // Stage kedua: Setup Virtual Environment
+        stage('Setup Virtual Environment') {
             steps {
                 script {
-                    sh 'python3 -m venv ${VIRTUAL_ENV}'
-                    sh """
-                        . ${VIRTUAL_ENV}/bin/activate
-                        pip install -r ${REQUIREMENTS_FILE}
-                    """
+                    // Cek jika sudah ada virtual environment atau perlu dibuat baru
+                    echo "Setting up virtual environment..."
+                    sh 'python3 -m venv ${VENV}'
+                    sh './${VENV}/bin/pip install -r requirements.txt'  // Install dependencies
                 }
             }
         }
 
-        stage('Run Bandit Scan') {
+        // Stage ketiga: Jalankan analisis SAST menggunakan Bandit
+        stage('SAST Analysis') {
             steps {
                 script {
-                    sh """
-                        . ${VIRTUAL_ENV}/bin/activate
-                        bandit -r . -f json -o ${BANDIT_REPORT}
-                    """
-                }
-            }
-        }
-
-        stage('Publish Bandit Results') {
-            steps {
-                script {
-                    archiveArtifacts artifacts: "${BANDIT_REPORT}", allowEmptyArchive: true
-                }
-            }
-        }
-
-        stage('Notify') {
-            steps {
-                script {
-                    if (currentBuild.result == 'SUCCESS') {
-                        echo "Pipeline selesai dengan sukses."
-                    } else {
-                        echo "Pipeline gagal. Periksa log untuk detail lebih lanjut."
-                    }
+                    echo "Running SAST Analysis with Bandit..."
+                    
+                    // Jalankan Bandit untuk analisis keamanan
+                    sh './${VENV}/bin/bandit -r . -f json -o bandit-report.json'
+                    
+                    // Menampilkan laporan Bandit di terminal (opsional)
+                    sh 'cat bandit-report.json'
                 }
             }
         }
@@ -61,14 +43,8 @@ pipeline {
 
     post {
         always {
-            echo "Membersihkan lingkungan virtual."
-            sh 'rm -rf ${VIRTUAL_ENV}'
-        }
-        failure {
-            echo "Pipeline gagal. Periksa log untuk detail lebih lanjut."
-        }
-        success {
-            echo "Pipeline berhasil dijalankan."
+            echo "Cleaning up workspace..."
+            cleanWs()  // Menghapus workspace setelah pipeline selesai
         }
     }
 }
